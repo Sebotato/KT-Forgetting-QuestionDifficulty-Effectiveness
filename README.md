@@ -33,8 +33,6 @@ To execute a decay function, adjust the `decay_function` configuration in the Py
 | Logarithmic decay | `'log'` |
 | Sigmoid decay | `'sig'` |
 | Inverse decay | `'inv'` |
-| Step decay | `'step'` |
-| Polynomial decay | `'pol'` |
 
 Below is an example of running `AKT` with exponential decay using Python file.
 
