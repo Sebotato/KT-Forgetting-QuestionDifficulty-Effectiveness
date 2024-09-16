@@ -23,7 +23,7 @@ edustudio r2m R2M_#DatasetName --dt #DatasetName --rawpath data/#DatasetName/raw
 ```
 
 ### Run DKT Models
-To execute a decay function, adjust the `decay_function` configuration in the Python file. The table below lists all available decay configuration options. For AKT, HawkesKT, RKT, and CT_NCM, the default setting is `'exp'` as explained in their original papers. For DKTForget and SimpleKT, the original model does not consider a memory decay function, hence its default setting is `'non'`. 
+For models with the forgetting feature, configuring a particular a decay function requries adjusting the `decay_function` configuration in the Python file. The table below lists all available decay configuration options. For AKT, HawkesKT and RKT, the default setting is `'exp'` as explained in their original papers. For DKTForget and SimpleKT, the original model does not consider a memory decay function, hence its default setting is `'non'`. For models with the question difficulty feature, adjusting the question difficulty feature requires specifying the `quesDiff_conf` configuration in the Python file.
 
 | **Name** | **Decay configuration options** |
 |----------|--------------|
@@ -33,6 +33,14 @@ To execute a decay function, adjust the `decay_function` configuration in the Py
 | Logarithmic decay | `'log'` |
 | Sigmoid decay | `'sig'` |
 | Inverse decay | `'inv'` |
+
+| **Name** | **Decay configuration options** |
+|----------|--------------|
+| Remove question difficulty | `'rem'` |
+| No question difficulty | `'non'` |
+| Adapt question difficulty | `'adapt'` |
+| Swap question difficulty | `'swap'` |
+
 
 Below is an example of running `AKT` with exponential decay using Python file.
 
