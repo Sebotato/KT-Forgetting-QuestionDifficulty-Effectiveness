@@ -33,7 +33,8 @@ class AKT(GDBaseModel):
         'final_fc_dim': 512      # dimension of final fully connected net before prediction
         'n_heads': 8      # number of heads. n_heads*d_feature = d_model
         'd_ff': 2048      # dimension for fully conntected net inside the basic block
-        'forgetting': True      # the function used for memory decay
+        'forgetting': True      # enable or remove forgetting
+        'quesDiff': True      # enable or remove question difficulty
     """
 
     default_cfg = {
@@ -47,6 +48,7 @@ class AKT(GDBaseModel):
         'n_heads': 8,
         'd_ff': 2048,
         'forgetting': True,
+        'quesDiff': True,
     }
     def _init_params(self):
         super()._init_params()
@@ -70,6 +72,7 @@ class AKT(GDBaseModel):
         self.n_heads = self.modeltpl_cfg['n_heads']
         self.d_ff = self.modeltpl_cfg['d_ff']
         self.forgetting = self.modeltpl_cfg['forgetting']
+        self.quesDiff = self.modeltpl_cfg['quesDiff']
         
     def build_model(self):
         embed_l = self.d_model
@@ -87,7 +90,7 @@ class AKT(GDBaseModel):
             self.qa_embed = nn.Embedding(2, embed_l)
         # Architecture Object. It contains stack of attention block
         self.model = Architecture(self.n_blocks, self.d_model, self.d_model // self.n_heads,
-                                  self.d_ff, self.n_heads, self.dropout, self.kq_same, self.device,self.forgetting)
+                                  self.d_ff, self.n_heads, self.dropout, self.kq_same, self.device, self.forgetting)
 
         self.out = nn.Sequential(
             nn.Linear(self.d_model + embed_l, self.final_fc_dim),
@@ -114,7 +117,8 @@ class AKT(GDBaseModel):
 
         c_reg_loss = torch.tensor(0).to(self.device)
 
-        if self.n_pid > 0:
+        # remove question difficulty if quesDiff is set to false
+        if self.n_pid > 0 and self.quesDiff == False:
             q_embed_diff_data = self.q_embed_diff(cpt_unfold_seq)
             pid_embed_data = self.difficult_param(exer_seq)
             q_embed_data = q_embed_data + pid_embed_data * q_embed_diff_data
