@@ -33,7 +33,7 @@ class AKT(GDBaseModel):
         'final_fc_dim': 512      # dimension of final fully connected net before prediction
         'n_heads': 8      # number of heads. n_heads*d_feature = d_model
         'd_ff': 2048      # dimension for fully conntected net inside the basic block
-        'decay_function': 'exp'      # the function used for memory decay
+        'forgetting': True      # the function used for memory decay
     """
 
     default_cfg = {
@@ -46,7 +46,7 @@ class AKT(GDBaseModel):
         'final_fc_dim': 512,
         'n_heads': 8,
         'd_ff': 2048,
-        'decay_function': 'exp',
+        'forgetting': True,
     }
     def _init_params(self):
         super()._init_params()
@@ -69,7 +69,7 @@ class AKT(GDBaseModel):
         self.final_fc_dim = self.modeltpl_cfg['final_fc_dim']
         self.n_heads = self.modeltpl_cfg['n_heads']
         self.d_ff = self.modeltpl_cfg['d_ff']
-        self.decay_function = self.modeltpl_cfg['decay_function']
+        self.forgetting = self.modeltpl_cfg['forgetting']
         
     def build_model(self):
         embed_l = self.d_model
@@ -87,7 +87,7 @@ class AKT(GDBaseModel):
             self.qa_embed = nn.Embedding(2, embed_l)
         # Architecture Object. It contains stack of attention block
         self.model = Architecture(self.n_blocks, self.d_model, self.d_model // self.n_heads,
-                                  self.d_ff, self.n_heads, self.dropout, self.kq_same, self.device,self.decay_function)
+                                  self.d_ff, self.n_heads, self.dropout, self.kq_same, self.device,self.forgetting)
 
         self.out = nn.Sequential(
             nn.Linear(self.d_model + embed_l, self.final_fc_dim),
@@ -168,7 +168,7 @@ class AKT(GDBaseModel):
         return self.get_main_loss(**kwargs)
 
 class Architecture(nn.Module):
-    def __init__(self, n_blocks, d_model, d_feature, d_ff, n_heads, dropout, kq_same, device,decay_function):
+    def __init__(self, n_blocks, d_model, d_feature, d_ff, n_heads, dropout, kq_same, device,forgetting):
         super(Architecture, self).__init__()
         """
             n_block : number of stacked blocks in the attention
@@ -179,11 +179,11 @@ class Architecture(nn.Module):
         self.d_model = d_model
 
         self.blocks_1 = nn.ModuleList([
-            TransformerLayer(d_model, d_feature, d_ff, n_heads, dropout, kq_same, device,decay_function)
+            TransformerLayer(d_model, d_feature, d_ff, n_heads, dropout, kq_same, device,forgetting)
             for _ in range(n_blocks)
         ])
         self.blocks_2 = nn.ModuleList([
-            TransformerLayer(d_model, d_feature, d_ff, n_heads, dropout, kq_same, device,decay_function)
+            TransformerLayer(d_model, d_feature, d_ff, n_heads, dropout, kq_same, device,forgetting)
             for _ in range(n_blocks * 2)
         ])
 
@@ -206,7 +206,7 @@ class Architecture(nn.Module):
 
 
 class TransformerLayer(nn.Module):
-    def __init__(self, d_model, d_feature, d_ff, n_heads, dropout, kq_same, device,decay_function):
+    def __init__(self, d_model, d_feature, d_ff, n_heads, dropout, kq_same, device,forgetting):
         super(TransformerLayer, self).__init__()
         """
         This is a Basic Block of Transformer paper. It contains one Multi-head attention object. Followed by layer
@@ -215,7 +215,7 @@ class TransformerLayer(nn.Module):
         self.device = device
         kq_same = kq_same == 1
         # Multi-Head Attention Block
-        self.masked_attn_head = MultiHeadAttention(d_model, d_feature, n_heads, dropout, device, kq_same=kq_same,decay_function=decay_function)
+        self.masked_attn_head = MultiHeadAttention(d_model, d_feature, n_heads, dropout, device, kq_same=kq_same,forgetting=forgetting)
 
         # Two layer norm layer and two dropout layer
         self.layer_norm1 = nn.LayerNorm(d_model)
@@ -261,7 +261,7 @@ class TransformerLayer(nn.Module):
 
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, d_model, d_feature, n_heads, dropout, device, kq_same, decay_function, bias=True):
+    def __init__(self, d_model, d_feature, n_heads, dropout, device, kq_same, forgetting, bias=True):
         super(MultiHeadAttention, self).__init__()
         """
         It has projection layer for getting keys, queries and values. Followed by attention and a connected layer.
@@ -277,7 +277,7 @@ class MultiHeadAttention(nn.Module):
         if kq_same is False:
             self.q_linear = nn.Linear(d_model, d_model, bias=bias)
         self.dropout = nn.Dropout(dropout)
-        self.decay_function = decay_function
+        self.forgetting = forgetting
         self.proj_bias = bias
         self.out_proj = nn.Linear(d_model, d_model, bias=bias)
         self.gammas = nn.Parameter(torch.zeros(n_heads, 1, 1))
@@ -319,7 +319,7 @@ class MultiHeadAttention(nn.Module):
             # Corrected: Use torch.sqrt for tensor compatibility
         scores = torch.matmul(q, k.transpose(-2, -1)) / torch.sqrt(torch.tensor(d_k, dtype=torch.float))
 
-        if self.decay_function != "rem":
+        if self.forgetting == True:
 
             bs, head, seqlen = scores.size(0), scores.size(1), scores.size(2)
             x1 = torch.arange(seqlen).expand(seqlen, -1).to(device)
@@ -336,25 +336,7 @@ class MultiHeadAttention(nn.Module):
                 dist_scores = dist_scores.sqrt().detach()
             m = nn.Softplus()
             gamma = -1. * m(gamma).unsqueeze(0)
-            if self.decay_function == "exp":
-                total_effect = torch.clamp(torch.clamp((dist_scores*gamma).exp(), min=1e-5), max=1e5) #------AS: Exp decay
-            elif self.decay_function == "log":
-                total_effect = torch.clamp(torch.log1p(torch.clamp(dist_scores * gamma, min=0)), min=1e-5, max=1e5) #------AS:log decay
-            elif self.decay_function == "sig":
-                total_effect = torch.clamp(1 / (1 + torch.exp(-dist_scores * gamma)), min=1e-5, max=1e5)  #-----AS: sig decay
-            elif self.decay_function == "pol":
-                p=5
-                normalized_factor = torch.clamp(dist_scores * gamma, 0, 1)
-                total_effect = torch.clamp((1 - normalized_factor) ** p, min=1e-5, max=1e5)
-            elif self.decay_function == "inv":
-                epsilon = 1e-5
-                total_effect = torch.clamp(1 / (epsilon + torch.clamp(dist_scores * gamma, min=0)), min=1e-5, max=1e5) #-----AS: inverse decay
-            else:
-                decay_rate = 1.5
-                threshold = 0.5
-                total_effect = torch.where(dist_scores * gamma > threshold,torch.clamp(dist_scores * gamma * decay_rate, min=1e-5, max=1e5),
-                                           torch.clamp(dist_scores * gamma, min=1e-5, max=1e5))
-
+            total_effect = torch.clamp(torch.clamp((dist_scores*gamma).exp(), min=1e-5), max=1e5) #------AS: Exp decay
             scores = scores * total_effect
 
         scores.masked_fill(mask == 0, -1e23)

@@ -16,7 +16,7 @@ class HawkesKT(GDBaseModel):
         'dim_s': 50,  # 序列长度
         'emb_size': 64,
         'time_log': 5,  # Log base of time intervals.
-        'decay_function': 'exp',
+        'forgetting': True,
     }
 
     def __init__(self, cfg):
@@ -33,7 +33,7 @@ class HawkesKT(GDBaseModel):
         self.skill_num = self.datatpl_cfg['dt_info']['cpt_count']
         self.emb_size = self.modeltpl_cfg['emb_size']
         self.time_log = self.modeltpl_cfg['time_log']
-        self.decay_function = self.modeltpl_cfg['decay_function']
+        self.forgetting = self.modeltpl_cfg['forgetting']
 
 
     def build_model(self):
@@ -75,7 +75,7 @@ class HawkesKT(GDBaseModel):
             torch.Tensor: The predictions of the model
         """
 
-        if self.decay_function == "rem":
+        if self.forgetting == False:
             skills = cpt_unfold_seq     # [batch_size, seq_len] One exercise corresponds to one knowledge point
             problems = exer_seq  # [batch_size, seq_len] sequence of batch_size students
 
@@ -125,22 +125,7 @@ class HawkesKT(GDBaseModel):
             delta_t = (times[:, :, None] - times[:, None, :]).abs().double()  # Get the absolute value of the time at different time steps
             delta_t = torch.log(delta_t + 1e-10) / np.log(self.time_log)
 
-            if self.decay_function == "exp":
-                cross_effects = alphas * torch.exp(-betas * delta_t)  # The cross_effects of the paper (4)
-            elif self.decay_function == "log":
-                cross_effects = torch.div(alphas, torch.log(torch.clamp(betas * delta_t + torch.exp(torch.tensor(1)), min = 0)))
-
-            elif self.decay_function == "sig":
-                sig = nn.Sigmoid()
-                cross_effects = alphas * sig(betas * delta_t)  # The cross_effects of the paper (4)
-            elif self.decay_function == "pol":
-                polynomial_decay = 1 / (1 + betas * delta_t) ** 5
-                cross_effects = alphas * polynomial_decay  # Updated cross_effects with polynomial decay
-            elif self.decay_function == "inv":
-                cross_effects = torch.div(alphas, (betas * delta_t + torch.tensor(1)))  # The cross_effects of the paper (4)
-            else:
-                decay_factor = torch.where(delta_t > 0.5, torch.tensor(1.5).double(), torch.tensor(1.0).double())
-                cross_effects = alphas * decay_factor
+            cross_effects = alphas * torch.exp(-betas * delta_t)  # The cross_effects of the paper (4)
 
             seq_len = skills.shape[1]
             valid_mask = np.triu(np.ones((1, seq_len, seq_len)), k=1)

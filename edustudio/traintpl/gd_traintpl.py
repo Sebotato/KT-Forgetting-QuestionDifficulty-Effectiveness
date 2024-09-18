@@ -20,8 +20,9 @@ class GDTrainTPL(BaseTrainTPL):
         'eps': 1e-8,
         'weight_decay': 0.0, 
 
-        ## added decay function hyperparameter
-        'decay_function': 'exp',
+        ## added feature removal 
+        'forgetting': True,
+        'quesDiff': True,
     }
 
     def __init__(self, cfg: UnifyConfig):

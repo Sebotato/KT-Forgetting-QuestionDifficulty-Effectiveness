@@ -38,7 +38,7 @@ class RKT(GDBaseModel):
         'encode_pos': False,
         'max_pos': 10,
         'drop_prob':0.2,
-        'decay_function': 'exp',
+        'forgetting': True,
     }
 
 
@@ -51,7 +51,7 @@ class RKT(GDBaseModel):
         self.encode_pos = self.modeltpl_cfg['encode_pos']
         self.max_pos = self.modeltpl_cfg['max_pos']
         self.drop_prob = self.modeltpl_cfg['drop_prob']
-        self.decay_function = self.modeltpl_cfg['decay_function']
+        self.forgetting = self.modeltpl_cfg['forgetting']
         
     def build_model(self):
         self.item_embeds = nn.Embedding(self.n_item, self.embed_size, padding_idx=0)
@@ -176,7 +176,7 @@ def clone(module, num):
 def attention(self, query, key, value, rel, l1, l2, timestamp, mask=None, dropout=None, device='cpu'):
     """Compute scaled dot product attention.
     """
-    if self.decay_function == "rem":
+    if self.forgetting == False:
         rel = rel * mask.to(torch.float) # future masking of correlation matrix.
         rel_attn = rel.masked_fill(rel == 0, -10000)
         rel_attn = nn.Softmax(dim=-1)(rel_attn)
@@ -204,27 +204,7 @@ def attention(self, query, key, value, rel, l1, l2, timestamp, mask=None, dropou
         scores = scores / math.sqrt(query.size(-1))
         if mask is not None:
             scores = scores.masked_fill(mask, -1e9)
-
-            if self.decay_function == "exp":
-                time_stamp= torch.exp(-torch.abs(timestamp.float()))
-
-            elif self.decay_function == "log":
-                time_stamp= torch.div(torch.tensor(1), torch.log(torch.clamp(torch.abs(timestamp.float()) + torch.exp(torch.tensor(1)), min = 0)))
-
-            elif self.decay_function == "sig":
-                time_stamp = 1 / (1 + torch.exp(-timestamp.float()))
-
-            elif self.decay_function == "pol":
-                normalized_timestamp = timestamp.float() / timestamp.max()
-                time_stamp = (1 - normalized_timestamp) ** 5
-
-            elif self.decay_function == "inv":
-                time_stamp = 1 / (1 + torch.abs(timestamp.float()))
-
-            else:
-                time_stamp = torch.where(timestamp.float() > 0.5, timestamp.float() * 1.5, timestamp.float())
-                time_stamp = time_stamp.masked_fill(mask, -np.inf)
-
+            time_stamp= torch.exp(-torch.abs(timestamp.float()))
             time_stamp=time_stamp.masked_fill(mask,-np.inf)
 
         prob_attn = F.softmax(scores, dim=-1)

@@ -18,7 +18,7 @@ class SimpleKT(GDBaseModel):
         'final_fc_dim': 512,
         'n_heads': 8,
         'd_ff': 2048,
-        'decay_function': 'exp',
+        'forgetting': True,
     }
 
     def __init__(self, cfg):
@@ -48,7 +48,7 @@ class SimpleKT(GDBaseModel):
         self.d_ff = self.modeltpl_cfg['d_ff']
         self.seq_len = self.datatpl_cfg['dt_info']['real_window_size']
         self.device = self.traintpl_cfg['device']
-        self.decay_function = self.modeltpl_cfg['decay_function']
+        self.forgetting = self.modeltpl_cfg['forgetting']
 
     def build_model(self):
         embed_l = self.d_model
@@ -72,7 +72,7 @@ class SimpleKT(GDBaseModel):
         self.model = Architecture(n_blocks=self.n_blocks,
                                   n_heads=self.n_heads, dropout=self.dropout,
                                   d_model=self.d_model,
-                                  d_ff=self.d_ff, kq_same=self.kq_same, seq_len=self.seq_len, device=self.device, decay_function = self.decay_function)
+                                  d_ff=self.d_ff, kq_same=self.kq_same, seq_len=self.seq_len, device=self.device, forgetting = self.forgetting)
 
         self.out = nn.Sequential(
             nn.Linear(self.d_model + embed_l, self.final_fc_dim),
@@ -151,7 +151,7 @@ class SimpleKT(GDBaseModel):
 
 class Architecture(nn.Module):
     def __init__(self, n_blocks, d_model,
-                 d_ff, n_heads, dropout, kq_same, seq_len, device, decay_function):
+                 d_ff, n_heads, dropout, kq_same, seq_len, device, forgetting):
         super().__init__()
         """
             n_block : number of stacked blocks in the attention
@@ -165,7 +165,7 @@ class Architecture(nn.Module):
 
         self.blocks_2 = nn.ModuleList([
                 TransformerLayer(d_model=d_model, d_feature=d_model // n_heads,
-                                 d_ff=d_ff, dropout=dropout, n_heads=n_heads, kq_same=kq_same, device = device, decay_function = decay_function)
+                                 d_ff=d_ff, dropout=dropout, n_heads=n_heads, kq_same=kq_same, device = device, forgetting = forgetting)
                 for _ in range(n_blocks)
             ])
         self.position_emb = CosinePositionalEmbedding(d_model=self.d_model, max_len=seq_len)
@@ -198,7 +198,7 @@ class Architecture(nn.Module):
 
 class TransformerLayer(nn.Module):
     def __init__(self, d_model, d_feature,
-                 d_ff, n_heads, dropout, kq_same, device, decay_function):
+                 d_ff, n_heads, dropout, kq_same, device, forgetting):
         super().__init__()
         """
             This is a Basic Block of Transformer paper. It containts one Multi-head attention object. Followed by layer norm and postion wise feedforward net and dropout layer.
@@ -207,7 +207,7 @@ class TransformerLayer(nn.Module):
         self.device = device
         # Multi-Head Attention Block
         self.masked_attn_head = MultiHeadAttention(
-            d_model, d_feature, n_heads, dropout, kq_same=kq_same, device=device, decay_function = decay_function)
+            d_model, d_feature, n_heads, dropout, kq_same=kq_same, device=device, forgetting = forgetting)
 
         # Two layer norm layer and two droput layer
         self.layer_norm1 = nn.LayerNorm(d_model)
@@ -260,7 +260,7 @@ class TransformerLayer(nn.Module):
 
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, d_model, d_feature, n_heads, dropout, kq_same, device, decay_function, bias=True):
+    def __init__(self, d_model, d_feature, n_heads, dropout, kq_same, device, forgetting, bias=True):
         super().__init__()
         """
         It has projection layer for getting keys, queries and values. Followed by attention and a connected layer.
@@ -276,7 +276,7 @@ class MultiHeadAttention(nn.Module):
         if kq_same is False:
             self.q_linear = nn.Linear(d_model, d_model, bias=bias)
         self.dropout = nn.Dropout(dropout)
-        self.decay_function = decay_function
+        self.forgetting = forgetting
         self.proj_bias = bias
         self.out_proj = nn.Linear(d_model, d_model, bias=bias)
         #------AS: add gammas into connected layer
@@ -337,7 +337,7 @@ def attention(self, q, k, v, d_k, mask, dropout, zero_pad, device, gamma=None): 
     # d_k: 每一个头的dim
     scores = torch.matmul(q, k.transpose(-2, -1)) / \
              math.sqrt(d_k)  # BS, 8, seqlen, seqlen
-    if self.decay_function != "rem":
+    if self.forgetting == True:
         bs, head, seqlen = scores.size(0), scores.size(1), scores.size(2)
         #------AS: calculated distance, then apply decay function onto the attention score[same as AKT]
         #------AS: start here---------
@@ -359,24 +359,7 @@ def attention(self, q, k, v, d_k, mask, dropout, zero_pad, device, gamma=None): 
             dist_scores = dist_scores.sqrt().detach()
         m = nn.Softplus()
         gamma = -1. * m(gamma).unsqueeze(0)  # 1,8,1,1
-        if self.decay_function == "exp":
-            total_effect = torch.clamp(torch.clamp((dist_scores*gamma).exp(), min=1e-5), max=1e5) #------AS: Exp decay
-        elif self.decay_function == "log":
-            total_effect = torch.clamp(torch.log1p(torch.clamp(dist_scores * gamma, min=0)), min=1e-5, max=1e5) #------AS:log decay
-        elif self.decay_function == "sig":
-            total_effect = torch.clamp(1 / (1 + torch.exp(-dist_scores * gamma)), min=1e-5, max=1e5)  #-----AS: sig decay
-        elif self.decay_function == "pol":
-            p=5
-            normalized_factor = torch.clamp(dist_scores * gamma, 0, 1)
-            total_effect = torch.clamp((1 - normalized_factor) ** p, min=1e-5, max=1e5)
-        elif self.decay_function == "inv":
-            epsilon = 1e-5
-            total_effect = torch.clamp(1 / (epsilon + torch.clamp(dist_scores * gamma, min=0)), min=1e-5, max=1e5) #-----AS: inverse decay
-        else:
-            decay_rate = 1.5
-            threshold = 0.5
-            total_effect = torch.where(dist_scores * gamma > threshold,torch.clamp(dist_scores * gamma * decay_rate, min=1e-5, max=1e5),
-                                                                torch.clamp(dist_scores * gamma, min=1e-5, max=1e5))
+        total_effect = torch.clamp(torch.clamp((dist_scores*gamma).exp(), min=1e-5), max=1e5) #------AS: Exp decay
         scores = scores * total_effect
     #------AS: Ends here---------
     scores.masked_fill_(mask == 0, -1e32).to(device)

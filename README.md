@@ -23,7 +23,7 @@ edustudio r2m R2M_#DatasetName --dt #DatasetName --rawpath data/#DatasetName/raw
 ```
 
 ### Run DKT Models
-To run a particular model, a Python file containing the dataset name and configuration information can be constructed for execution. The configuration information should follow the guideline on [Reference Table](https://edustudio.readthedocs.io/en/latest/user_guide/reference_table.html). For models with forgetting incorporated, forgetting removal can be achieved by configuring the `forgetting` parameter in the Python file to `False`. Likewise, for models with question difficulty incorporated, question difficulty removal can be achieved by configuring the `quesDiff` parameter in the Python file to `False`.
+To run a particular model, a Python file containing the model name, dataset name and configuration information can be constructed for execution. The configuration information should follow the guideline on [Reference Table](https://edustudio.readthedocs.io/en/latest/user_guide/reference_table.html). For models with forgetting incorporated, forgetting removal can be achieved by configuring the `forgetting` parameter in the Python file to `False`. Likewise, for models with question difficulty incorporated, question difficulty removal can be achieved by configuring the `quesDiff` parameter in the Python file to `False`.
 
 Below is an example of running `AKT` with forgetting removed using the Python file.
 
