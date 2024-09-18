@@ -84,9 +84,14 @@ DKT models' configuration settings other than decay function can be found at : h
 | [AKT](https://dl.acm.org/doi/abs/10.1145/3394486.3403282) | Context-Aware Attentive Knowledge Tracing | KDD | 2020 |
 | [HawkesKT](https://dl.acm.org/doi/10.1145/3437963.3441802) | Temporal cross-effects in knowledge tracing | WSDM | 2021 |
 | [RKT](https://arxiv.org/pdf/2008.12736) | RKT: Relation-Aware Self-Attention for Knowledge Tracing | CIKM | 2020 |
-| [CT-NCM](https://www.semanticscholar.org/paper/Reconciling-Cognitive-Modeling-with-Knowledge-A-Ma-Wang/d3b4115906be4939b7f93736090ec1844d9ae591) | Reconciling Cognitive Modeling with Knowledge Forgetting: A Continuous Time-aware Neural Network Approach | IJCAI | 2022 |
-| [DKTForget](https://dl.acm.org/doi/10.1145/3308558.3313565) | Augmenting Knowledge Tracing by Considering Forgetting Behavior | WWW | 2019 |
-| [SimpleKT](https://arxiv.org/abs/2302.06881) | simpleKT: A Simple But Tough-to-Beat Baseline for Knowledge Tracing | ICLR | 2023 |
+| [DKT+Forget](https://dl.acm.org/doi/10.1145/3308558.3313565) | Augmenting Knowledge Tracing by Considering Forgetting Behavior | WWW | 2019 |
+| [simpleKT](https://arxiv.org/abs/2302.06881) | simpleKT: A Simple But Tough-to-Beat Baseline for Knowledge Tracing | ICLR | 2023 |
+| [SAINT+](https://dl.acm.org/doi/10.1145/3448139.3448188) | SAINT+: Integrating Temporal Features for EdNet Correctness Prediction | LAK | 2021 |
+| [DKVMN](https://arxiv.org/abs/1611.08108) | Dynamic Key-Value Memory Networks for Knowledge Tracing | WWW | 2017 |
+| [Deep-IRT](https://arxiv.org/abs/1904.11738) | Deep-IRT: Make Deep Learning Based Knowledge Tracing Explainable Using Item Response Theory | EDM | 2019 |
+| [EKT](https://ieeexplore.ieee.org/document/8744302) | EKT: Exercise-Aware Knowledge Tracing for Student Performance Prediction | TKDE | 2019 |
+| [DIMKT](https://dl.acm.org/doi/abs/10.1145/3477495.3531939) | Assessing Student's Dynamic Knowledge State by Exploring the Question Difficulty Effect | SIGIR | 2022 |
+| [QIKT](https://arxiv.org/abs/2302.06885) | Improving Interpretability of Deep Sequential Knowledge Tracing Models with Question-centric Cognitive Representations | AAAI | 2023 |
 
 - A summary of information for the selected datasets
 
