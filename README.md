@@ -23,26 +23,9 @@ edustudio r2m R2M_#DatasetName --dt #DatasetName --rawpath data/#DatasetName/raw
 ```
 
 ### Run DKT Models
-For models with the forgetting feature, configuring a particular a decay function requries adjusting the `decay_function` configuration in the Python file. The table below lists all available decay configuration options. For AKT, HawkesKT and RKT, the default setting is `'exp'` as explained in their original papers. For DKTForget and SimpleKT, the original model does not consider a memory decay function, hence its default setting is `'non'`. For models with the question difficulty feature, adjusting the question difficulty feature requires specifying the `quesDiff_conf` configuration in the Python file.
+To run a particular model, a Python file containing the dataset name and configuration information can be constructed for execution. The configuration information should follow the guideline on [Reference Table](https://edustudio.readthedocs.io/en/latest/user_guide/reference_table.html). For models with forgetting incorporated, forgetting removal can be achieved by configuring the `forgetting` parameter in the Python file to `False`. Likewise, for models with question difficulty incorporated, question difficulty removal can be achieved by configuring the `quesDiff` parameter in the Python file to `False`.
 
-| **Name** | **Decay configuration options** |
-|----------|--------------|
-| Remove forgetting | `'rem'` |
-| No decay | `'non'` |
-| Exponential decay | `'exp'` |
-| Logarithmic decay | `'log'` |
-| Sigmoid decay | `'sig'` |
-| Inverse decay | `'inv'` |
-
-| **Name** | **Decay configuration options** |
-|----------|--------------|
-| Remove question difficulty | `'rem'` |
-| No question difficulty | `'non'` |
-| Adapt question difficulty | `'adapt'` |
-| Swap question difficulty | `'swap'` |
-
-
-Below is an example of running `AKT` with exponential decay using Python file.
+Below is an example of running `AKT` with forgetting removed using the Python file.
 
 Create a Python file (e.g., run.py) to run, an example as below:
 
@@ -54,7 +37,7 @@ run_edustudio(
     cfg_file_name=None,
     traintpl_cfg_dict={
         'cls': 'GeneralTrainTPL',
-        'decay_function': 'exp'
+        'forgetting': False
     },
     datatpl_cfg_dict={
         'cls': 'KTInterDataTPLCptUnfold'
