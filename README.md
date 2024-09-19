@@ -1,11 +1,8 @@
-# Knowledge Fading Analysis
+# Forgetting and Question difficulty Ablation Study
 This repository accompanies the paper "Analysis of Knowledge Fading" submitted for double-blind review at LAK25.
 
 ## Overview
-
-### Key Features
-
-
+This study addresses these shortcomings by examining the impact of feature representations of forgetting and question difficulty on the effectiveness of DKT (Deep Knowledge Tracing) models. Our approach involves selecting various DKT models that incorporate difficulty and/or forgetting features, with the potential for extracting and analyzing their performance. By conducting ablation studies, this research aims to compare the effectiveness of forgetting and question difficulty features of recent DKT models across commonly-used datasets to answer the following research question: How effective are forgetting and question difficulty being modelled in SOTA DKT models?
 ## Quick Start
 ### Installation
 All implementations are conducted via the publicly available [EduStudio](https://edustudio.ai) library. EduStudio is compatible with the following operating systems: Linux, Windows 10 and macOS X. 
