@@ -18,7 +18,7 @@ class SimpleKT(GDBaseModel):
         'final_fc_dim': 512,
         'n_heads': 8,
         'd_ff': 2048,
-        'forgetting': True,
+        'quesDiff': True,
     }
 
     def __init__(self, cfg):
@@ -48,7 +48,7 @@ class SimpleKT(GDBaseModel):
         self.d_ff = self.modeltpl_cfg['d_ff']
         self.seq_len = self.datatpl_cfg['dt_info']['real_window_size']
         self.device = self.traintpl_cfg['device']
-        self.forgetting = self.modeltpl_cfg['forgetting']
+        self.quesDiff = self.modeltpl_cfg['quesDiff']
 
     def build_model(self):
         embed_l = self.d_model
@@ -58,9 +58,6 @@ class SimpleKT(GDBaseModel):
             self.difficult_param = nn.Embedding(self.n_pid + 1, 1)            # simpleKT QD
             self.q_embed_diff = nn.Embedding(self.n_question + 1, embed_l)       # simpleKT QD
             self.qa_embed_diff = nn.Embedding(2 * self.n_question + 1, embed_l)      # simpleKT QD
-
-            # To be used for feature swap with HawkesKT, otherwise ignore  
-            self.problem_base = torch.nn.Embedding(self.n_item, embed_l)      # HawkesKT QD 
 
         # n_question+1 ,d_model
         self.q_embed = nn.Embedding(self.n_question, embed_l)
@@ -72,7 +69,7 @@ class SimpleKT(GDBaseModel):
         self.model = Architecture(n_blocks=self.n_blocks,
                                   n_heads=self.n_heads, dropout=self.dropout,
                                   d_model=self.d_model,
-                                  d_ff=self.d_ff, kq_same=self.kq_same, seq_len=self.seq_len, device=self.device, forgetting = self.forgetting)
+                                  d_ff=self.d_ff, kq_same=self.kq_same, seq_len=self.seq_len, device=self.device)
 
         self.out = nn.Sequential(
             nn.Linear(self.d_model + embed_l, self.final_fc_dim),
@@ -96,18 +93,24 @@ class SimpleKT(GDBaseModel):
             qa_data = label_seq.long()
             qa_embed_data = self.qa_embed(qa_data) + q_embed_data
 
-        if self.n_pid > 0:
-            q_embed_diff_data = self.q_embed_diff(cpt_unfold_seq)   # simpleKT QD
-            pid_embed_data = self.difficult_param(exer_seq)   # simpleKT QD
-            q_embed_data = q_embed_data + pid_embed_data * q_embed_diff_data   # simpleKT QD
-            q_embed_data = q_embed_data + q_embed_diff_data    # simpleKT QD
-            qa_embed_diff_data = self.qa_embed_diff(qa_data)   # simpleKT QD
-            if self.separate_qa:   # simpleKT QD
-                qa_embed_data = qa_embed_data + pid_embed_data * qa_embed_diff_data   # simpleKT QD
-                qa_embed_data = qa_embed_data + qa_embed_diff_data    # simpleKT QD
-            else:   # simpleKT QD
-                qa_embed_data = qa_embed_data + pid_embed_data * (qa_embed_diff_data + q_embed_diff_data)   # simpleKT QD
-                qa_embed_data = qa_embed_data + (qa_embed_diff_data + q_embed_diff_data)   # simpleKT QD
+
+        # Feature Removal - conditional to remove QD completely from simpleKT 
+        if self.quesDiff == True:
+        ###################################################################
+            if self.n_pid > 0:
+                # simpleKT's original QD implementation
+                q_embed_diff_data = self.q_embed_diff(cpt_unfold_seq)   # simpleKT QD
+                pid_embed_data = self.difficult_param(exer_seq)   # simpleKT QD
+                q_embed_data = q_embed_data + pid_embed_data * q_embed_diff_data   # simpleKT QD
+                q_embed_data = q_embed_data + q_embed_diff_data    # simpleKT QD
+                qa_embed_diff_data = self.qa_embed_diff(qa_data)   # simpleKT QD
+                if self.separate_qa:   # simpleKT QD
+                    qa_embed_data = qa_embed_data + pid_embed_data * qa_embed_diff_data   # simpleKT QD
+                    qa_embed_data = qa_embed_data + qa_embed_diff_data    # simpleKT QD
+                else:   # simpleKT QD
+                    qa_embed_data = qa_embed_data + pid_embed_data * (qa_embed_diff_data + q_embed_diff_data)   # simpleKT QD
+                    qa_embed_data = qa_embed_data + (qa_embed_diff_data + q_embed_diff_data)   # simpleKT QD
+        ###################################################################
 
         d_output = self.model(q_embed_data, qa_embed_data)
         concat_q = torch.cat([d_output, q_embed_data], dim=-1)
@@ -151,7 +154,7 @@ class SimpleKT(GDBaseModel):
 
 class Architecture(nn.Module):
     def __init__(self, n_blocks, d_model,
-                 d_ff, n_heads, dropout, kq_same, seq_len, device, forgetting):
+                 d_ff, n_heads, dropout, kq_same, seq_len, device):
         super().__init__()
         """
             n_block : number of stacked blocks in the attention
@@ -165,7 +168,7 @@ class Architecture(nn.Module):
 
         self.blocks_2 = nn.ModuleList([
                 TransformerLayer(d_model=d_model, d_feature=d_model // n_heads,
-                                 d_ff=d_ff, dropout=dropout, n_heads=n_heads, kq_same=kq_same, device = device, forgetting = forgetting)
+                                 d_ff=d_ff, dropout=dropout, n_heads=n_heads, kq_same=kq_same, device = device)
                 for _ in range(n_blocks)
             ])
         self.position_emb = CosinePositionalEmbedding(d_model=self.d_model, max_len=seq_len)
@@ -198,7 +201,7 @@ class Architecture(nn.Module):
 
 class TransformerLayer(nn.Module):
     def __init__(self, d_model, d_feature,
-                 d_ff, n_heads, dropout, kq_same, device, forgetting):
+                 d_ff, n_heads, dropout, kq_same, device):
         super().__init__()
         """
             This is a Basic Block of Transformer paper. It containts one Multi-head attention object. Followed by layer norm and postion wise feedforward net and dropout layer.
@@ -207,7 +210,7 @@ class TransformerLayer(nn.Module):
         self.device = device
         # Multi-Head Attention Block
         self.masked_attn_head = MultiHeadAttention(
-            d_model, d_feature, n_heads, dropout, kq_same=kq_same, device=device, forgetting = forgetting)
+            d_model, d_feature, n_heads, dropout, kq_same=kq_same, device=device)
 
         # Two layer norm layer and two droput layer
         self.layer_norm1 = nn.LayerNorm(d_model)
@@ -260,7 +263,7 @@ class TransformerLayer(nn.Module):
 
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, d_model, d_feature, n_heads, dropout, kq_same, device, forgetting, bias=True):
+    def __init__(self, d_model, d_feature, n_heads, dropout, kq_same, device, bias=True):
         super().__init__()
         """
         It has projection layer for getting keys, queries and values. Followed by attention and a connected layer.
@@ -276,12 +279,8 @@ class MultiHeadAttention(nn.Module):
         if kq_same is False:
             self.q_linear = nn.Linear(d_model, d_model, bias=bias)
         self.dropout = nn.Dropout(dropout)
-        self.forgetting = forgetting
         self.proj_bias = bias
         self.out_proj = nn.Linear(d_model, d_model, bias=bias)
-        #------AS: add gammas into connected layer
-        self.gammas = nn.Parameter(torch.zeros(n_heads, 1, 1))
-        torch.nn.init.xavier_uniform_(self.gammas)
 
         self._reset_parameters()
 
@@ -317,9 +316,8 @@ class MultiHeadAttention(nn.Module):
         q = q.transpose(1, 2)
         v = v.transpose(1, 2)
         # calculate attention using function we will define next
-        gammas=self.gammas #-------AS: Add decay factor gamma
-        scores = attention(self, q, k, v, self.d_k,
-                           mask, self.dropout, zero_pad, self.device, gammas) #------AS: gammas
+        scores = attention(q, k, v, self.d_k,
+                           mask, self.dropout, zero_pad, self.device)
 
         # concatenate heads and put through final linear layer
         concat = scores.transpose(1, 2).contiguous() \
@@ -330,38 +328,15 @@ class MultiHeadAttention(nn.Module):
         return output
 
 
-def attention(self, q, k, v, d_k, mask, dropout, zero_pad, device, gamma=None): #-------AS:gamma
+def attention(q, k, v, d_k, mask, dropout, zero_pad, device):
     """
     This is called by Multi-head atention object to find the values.
     """
     # d_k: 每一个头的dim
     scores = torch.matmul(q, k.transpose(-2, -1)) / \
              math.sqrt(d_k)  # BS, 8, seqlen, seqlen
-    if self.forgetting == True:
-        bs, head, seqlen = scores.size(0), scores.size(1), scores.size(2)
-        #------AS: calculated distance, then apply decay function onto the attention score[same as AKT]
-        #------AS: start here---------
-        x1 = torch.arange(seqlen).expand(seqlen, -1).to(device)
-        x2 = x1.transpose(0, 1).contiguous()
+    bs, head, seqlen = scores.size(0), scores.size(1), scores.size(2)
 
-        with torch.no_grad():
-            scores_ = scores.masked_fill(mask == 0, -1e32)
-            scores_ = F.softmax(scores_, dim=-1)  # BS,8,seqlen,seqlen
-            scores_ = scores_ * mask.float().to(device)
-            distcum_scores = torch.cumsum(scores_, dim=-1)  # bs, 8, sl, sl
-            disttotal_scores = torch.sum(
-                scores_, dim=-1, keepdim=True)  # bs, 8, sl, 1
-            position_effect = torch.abs(
-                x1 - x2)[None, None, :, :].type(torch.FloatTensor).to(device)  # 1, 1, seqlen, seqlen
-            # bs, 8, sl, sl positive distance
-            dist_scores = torch.clamp(
-                (disttotal_scores - distcum_scores) * position_effect, min=0.)
-            dist_scores = dist_scores.sqrt().detach()
-        m = nn.Softplus()
-        gamma = -1. * m(gamma).unsqueeze(0)  # 1,8,1,1
-        total_effect = torch.clamp(torch.clamp((dist_scores*gamma).exp(), min=1e-5), max=1e5) #------AS: Exp decay
-        scores = scores * total_effect
-    #------AS: Ends here---------
     scores.masked_fill_(mask == 0, -1e32).to(device)
     scores = F.softmax(scores, dim=-1)  # BS,8,seqlen,seqlen
     # print(f"before zero pad scores: {scores.shape}")
