@@ -31,12 +31,14 @@ class SAINT_plus(GDBaseModel):
         'num_attn_heads': 8     # number of parallel attention heads
         'dropout_rate': 0.2     # dropout rate
         'n_blocks':4          # number of Encoder_blocks
+        'forgetting': True      # enable or remove forgetting
     """
     default_cfg = {
         'emb_size': 256,
         'num_attn_heads': 8,
         'dropout_rate': 0.2,
         'n_blocks':4,
+        'forgetting': True,
     }
 
 
@@ -49,26 +51,25 @@ class SAINT_plus(GDBaseModel):
         self.num_attn_heads = self.modeltpl_cfg['num_attn_heads']
         self.emb_size = self.modeltpl_cfg['emb_size']
         self.n_blocks = self.modeltpl_cfg['n_blocks']
+        self.forgetting = self.modeltpl_cfg['forgetting']
         
     def build_model(self):
         self.embd_pos = nn.Embedding(self.window_size, embedding_dim=self.emb_size)
         self.encoder = get_clones(Encoder_block(self.emb_size, self.num_attn_heads, self.num_q, self.num_c, self.window_size, self.dropout_r, self.device),
                                       self.n_blocks)
         
-        # Option 1: SAINT+'s original implementation of forgetting (untouched original code)
-        #####################################################################################################################
-        self.decoder = get_clones(Decoder_block(self.emb_size, 2, self.num_attn_heads, self.window_size,
-                                                self.dropout_r, self.num_q, self.num_c, self.device), self.n_blocks)
-        #####################################################################################################################
-
-
-
-        # Option 2: Feature Removal - remove forgetting
-        #####################################################################################################################
-        # Forgetting is removed by not incorporating the elapsed time and lag time (section 4.2 of the paper)
-        #self.decoder = get_clones(Decoder_block(self.emb_size, 2, self.num_attn_heads, self.window_size, 
-        #                                        self.dropout_r, self.device), self.n_blocks)
-        #####################################################################################################################
+        if self.forgetting == True:
+        # SAINT+'s original implementation of forgetting 
+            #####################################################################################################################
+            self.decoder = get_clones(Decoder_block(self.emb_size, 2, self.num_attn_heads, self.window_size,
+                                                    self.dropout_r, self.num_q, self.num_c, self.device), self.n_blocks, self.forgetting)
+            #####################################################################################################################
+        else:
+            #####################################################################################################################
+            # Forgetting is removed by not incorporating the elapsed time and lag time (section 4.2 of the paper)
+            self.decoder = get_clones(Decoder_block(self.emb_size, 2, self.num_attn_heads, self.window_size, 
+                                                   self.dropout_r, self.device), self.n_blocks, self.forgetting)
+            #####################################################################################################################
 
         self.dropout = Dropout(self.dropout_r)
         self.out = nn.Linear(in_features=self.emb_size, out_features=1)
@@ -94,17 +95,16 @@ class SAINT_plus(GDBaseModel):
             if i >= 1:
                 first_block = False
 
-            # Option 1: SAINT+'s original implementation of forgetting (untouched original code)
-            #####################################################################################################################
-            label_seq = self.decoder[i](raw_in_ex, raw_in_cat, label_seq, in_pos, en_out=exer_seq, first_block=first_block)
-            #####################################################################################################################
-
-
-            # Option 2: Feature Removal - remove forgetting
-            #####################################################################################################################
-            # Forgetting is removed by not considering the elapsed time and lag time embeddings
-            #label_seq = self.decoder[i](label_seq, in_pos, en_out=exer_seq, first_block=first_block) 
-            #####################################################################################################################
+            if self.forgetting == True:
+                # SAINT+'s original implementation of forgetting
+                #####################################################################################################################
+                label_seq = self.decoder[i](raw_in_ex, raw_in_cat, label_seq, in_pos, en_out=exer_seq, first_block=first_block)
+                #####################################################################################################################
+            else:
+                #####################################################################################################################
+                # Forgetting is removed by not considering the elapsed time and lag time embeddings
+                label_seq = self.decoder[i](label_seq, in_pos, en_out=exer_seq, first_block=first_block) 
+                #####################################################################################################################
 
         res = self.out(self.dropout(label_seq))
         res = torch.sigmoid(res).squeeze(-1)
@@ -254,7 +254,7 @@ class Decoder_block(nn.Module):
     L = SkipConct(FFN(LayerNorm(M2)))
     """
 
-    def __init__(self, dim_model, total_res, heads_de, seq_len, dropout,num_q,num_c, device):
+    def __init__(self, dim_model, total_res, heads_de, seq_len, dropout,num_q,num_c, device, forgetting):
         super().__init__()
         self.seq_len = seq_len
         self.device = device
@@ -275,6 +275,7 @@ class Decoder_block(nn.Module):
         self.dropout1 = Dropout(dropout)
         self.dropout2 = Dropout(dropout)
         self.dropout3 = Dropout(dropout)
+        self.forgetting = forgetting
 
 
     def forward(self, in_ex, in_cat, in_res, in_pos, en_out, first_block=True):
@@ -286,21 +287,21 @@ class Decoder_block(nn.Module):
             # print(f"in_res is {in_res}")
             # print(in_ex + self.num_q * in_res)
 
-            # Option 1: SAINT+'s original implementation of forgetting (untouched original code)
-            #####################################################################################################################
-            que_emb = self.embd_ex(in_ex + self.num_q * in_res)
-            cat_emb = self.emb_cat(in_cat + self.num_c * in_res)
+            if self.forgetting == True:
+                # SAINT+'s original implementation of forgetting
+                #####################################################################################################################
+                que_emb = self.embd_ex(in_ex + self.num_q * in_res)
+                cat_emb = self.emb_cat(in_cat + self.num_c * in_res)
 
-            # combining the embedings
-            out = in_in + que_emb + cat_emb + in_pos  # (b,n,d)
-            #####################################################################################################################
+                # combining the embedings
+                out = in_in + que_emb + cat_emb + in_pos  # (b,n,d)
+                #####################################################################################################################
 
-
-            # Option 2: Feature Removal - remove forgetting
-            #####################################################################################################################
-            # Removed forgetting: only the correctness and position embeddings are considered 
-            #out = in_in + in_pos
-            #####################################################################################################################
+            else:
+                #####################################################################################################################
+                # Removed forgetting: only the correctness and position embeddings are considered 
+                out = in_in + in_pos
+                #####################################################################################################################
 
         else:
             out = in_res
