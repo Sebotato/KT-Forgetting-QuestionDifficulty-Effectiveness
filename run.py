@@ -5,7 +5,8 @@ run_edustudio(
     cfg_file_name=None,
     traintpl_cfg_dict={
         'cls': 'GeneralTrainTPL',
-        'forgetting': False
+        'forgetting': False,
+        'quesDiff': False
     },
     datatpl_cfg_dict={
         'cls': 'KTInterCptUnfoldDataTPL'

@@ -1,0 +1,144 @@
+2024-09-23 11:48:04[INFO]: ============================================================
+2024-09-23 11:48:04[INFO]: [ID]: 2024-09-23-114803
+2024-09-23 11:48:04[INFO]: [DATASET]: Bridge2Algebra_0607
+2024-09-23 11:48:04[INFO]: [ARGV]: ['run.py']
+2024-09-23 11:48:04[INFO]: [ALL_CFG]: 
+{
+    "traintpl_cfg": {
+        "cls": "GeneralTrainTPL",
+        "num_stop_rounds": 10,
+        "early_stop_metrics": [
+            [
+                "auc",
+                "max"
+            ]
+        ],
+        "best_epoch_metric": "auc",
+        "unsave_best_epoch_pth": true,
+        "ignore_metrics_in_train": [],
+        "batch_size": 256,
+        "eval_batch_size": 128,
+        "device": "cuda:0",
+        "epoch_num": 100,
+        "num_workers": 0,
+        "lr": 0.001,
+        "optim": "adam",
+        "eps": 1e-08,
+        "weight_decay": 0.0,
+        "forgetting": false,
+        "quesDiff": false,
+        "seed": 2023
+    },
+    "datatpl_cfg": {
+        "cls": "KTInterCptUnfoldDataTPL",
+        "mid2cache_op_seq": [
+            "M2C_Label2Int",
+            "M2C_ReMapId",
+            "M2C_GenUnFoldKCSeq",
+            "M2C_BuildSeqInterFeats",
+            "M2C_RandomDataSplit4KT"
+        ],
+        "M2C_BuildSeqInterFeats": {
+            "extra_inter_feats": [
+                "start_timestamp:float",
+                "cpt_unfold:token"
+            ],
+            "window_size": 100
+        },
+        "exer_exclude_feat_names": [],
+        "stu_exclude_feat_names": [],
+        "seperator": ",",
+        "n_folds": 1,
+        "is_dataset_divided": false,
+        "is_save_cache": false,
+        "cache_id": "cache_default",
+        "load_data_from": "middata",
+        "inter_exclude_feat_names": [],
+        "raw2mid_op": "None",
+        "seed": 2023,
+        "M2C_Label2Int": {},
+        "M2C_ReMapId": {
+            "share_id_columns": [],
+            "ignore_columns": "{'order_id:token'}"
+        },
+        "M2C_GenUnFoldKCSeq": {},
+        "M2C_RandomDataSplit4KT": {
+            "seed": 2023,
+            "divide_by": "stu",
+            "divide_scale_list": [
+                7,
+                1,
+                2
+            ]
+        }
+    },
+    "modeltpl_cfg": {
+        "cls": "AKT",
+        "l2": 1e-05,
+        "kq_same": 1,
+        "dropout_rate": 0.05,
+        "separate_qa": false,
+        "d_model": 256,
+        "n_blocks": 1,
+        "final_fc_dim": 512,
+        "n_heads": 8,
+        "d_ff": 2048,
+        "forgetting": true,
+        "quesDiff": true,
+        "param_init_type": "xavier_normal",
+        "pretrained_file_path": ""
+    },
+    "evaltpl_cfg": {
+        "clses": [
+            "PredictionEvalTPL"
+        ],
+        "PredictionEvalTPL": {
+            "use_metrics": [
+                "auc",
+                "acc",
+                "rmse"
+            ]
+        }
+    },
+    "frame_cfg": {
+        "ARCHIVE_FOLDER_PATH": "/Users/sebastian/Stuff/ANU/Postgraduate/2023/Sem2/COMP8755/Knowledge-Fading-Analysis/archive",
+        "CFG_FOLDER_PATH": "/Users/sebastian/Stuff/ANU/Postgraduate/2023/Sem2/COMP8755/Knowledge-Fading-Analysis/conf",
+        "DATA_FOLDER_PATH": "/Users/sebastian/Stuff/ANU/Postgraduate/2023/Sem2/COMP8755/Knowledge-Fading-Analysis/data",
+        "DISABLE_LOG_STDOUT": false,
+        "DISABLE_TQDM_BAR": false,
+        "DT_INFO_DICT": {},
+        "DT_INFO_FILE_PATH": "/Users/sebastian/Stuff/ANU/Postgraduate/2023/Sem2/COMP8755/Knowledge-Fading-Analysis/edustudio/assets/datasets.yaml",
+        "EDUSTUDIO_VERSION": "v1.1.3",
+        "ID": "2024-09-23-114803",
+        "LOG_WITHOUT_DATE": false,
+        "TEMP_FOLDER_PATH": "/Users/sebastian/Stuff/ANU/Postgraduate/2023/Sem2/COMP8755/Knowledge-Fading-Analysis/temp",
+        "TQDM_NCOLS": 100,
+        "WORK_DIR": "/Users/sebastian/Stuff/ANU/Postgraduate/2023/Sem2/COMP8755/Knowledge-Fading-Analysis",
+        "data_folder_path": "/Users/sebastian/Stuff/ANU/Postgraduate/2023/Sem2/COMP8755/Knowledge-Fading-Analysis/data/Bridge2Algebra_0607",
+        "temp_folder_path": "/Users/sebastian/Stuff/ANU/Postgraduate/2023/Sem2/COMP8755/Knowledge-Fading-Analysis/temp/Bridge2Algebra_0607/GeneralTrainTPL/AKT/2024-09-23-114803",
+        "archive_folder_path": "/Users/sebastian/Stuff/ANU/Postgraduate/2023/Sem2/COMP8755/Knowledge-Fading-Analysis/archive/Bridge2Algebra_0607/GeneralTrainTPL/AKT"
+    },
+    "dataset": "Bridge2Algebra_0607",
+    "logger": "<Logger edustudio (DEBUG)>"
+}
+2024-09-23 11:48:04[INFO]: ============================================================
+2024-09-23 11:48:06[INFO]: actual window size: 100
+2024-09-23 11:48:06[INFO]: {'real_window_size': 100, 'stu_count': 1146, 'exer_count': 19023, 'cpt_count': 611}
+2024-09-23 11:48:06[INFO]: TrainTPL <class 'edustudio.traintpl.general_traintpl.GeneralTrainTPL'> Started!
+2024-09-23 11:48:06[ERROR]: Traceback (most recent call last):
+  File "/Users/sebastian/Stuff/ANU/Postgraduate/2023/Sem2/COMP8755/Knowledge-Fading-Analysis/edustudio/quickstart/quickstart.py", line 58, in run_edustudio
+    traintpl.start()
+  File "/Users/sebastian/Stuff/ANU/Postgraduate/2023/Sem2/COMP8755/Knowledge-Fading-Analysis/edustudio/traintpl/gd_traintpl.py", line 80, in start
+    self.model.to(self.model.device)
+  File "/Users/sebastian/miniconda3/envs/tf/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1145, in to
+    return self._apply(convert)
+  File "/Users/sebastian/miniconda3/envs/tf/lib/python3.10/site-packages/torch/nn/modules/module.py", line 797, in _apply
+    module._apply(fn)
+  File "/Users/sebastian/miniconda3/envs/tf/lib/python3.10/site-packages/torch/nn/modules/module.py", line 820, in _apply
+    param_applied = fn(param)
+  File "/Users/sebastian/miniconda3/envs/tf/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1143, in convert
+    return t.to(device, dtype if t.is_floating_point() or t.is_complex() else None, non_blocking)
+  File "/Users/sebastian/miniconda3/envs/tf/lib/python3.10/site-packages/torch/cuda/__init__.py", line 239, in _lazy_init
+    raise AssertionError("Torch not compiled with CUDA enabled")
+AssertionError: Torch not compiled with CUDA enabled
+
