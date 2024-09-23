@@ -9,6 +9,7 @@ class DKVMN(GDBaseModel):
         'dim_s': 200,
         'size_m': 50,
         'drop_out': 0.2,
+        'forgetting': True,
     }
 
     def __init__(self, cfg):
@@ -22,6 +23,7 @@ class DKVMN(GDBaseModel):
     def build_cfg(self):
         self.n_user = self.datatpl_cfg['dt_info']['stu_count']
         self.n_item = self.datatpl_cfg['dt_info']['exer_count']
+        self.forgetting = self.modeltpl_cfg['forgetting']
 
     def build_model(self):
         self.k_emb_layer = nn.Embedding(self.n_item, self.modeltpl_cfg['dim_s'])
@@ -34,8 +36,9 @@ class DKVMN(GDBaseModel):
         self.dropout_layer = nn.Dropout(self.modeltpl_cfg['drop_out'])
         self.p_layer = nn.Linear(self.modeltpl_cfg['dim_s'], 1)
 
-        # Option 2: Feature Removal - remove the next line to remove forgetting
-        self.e_layer = nn.Linear(self.modeltpl_cfg['dim_s'], self.modeltpl_cfg['dim_s'])  ## Forgetting - Erase layer
+        # Forgetting Removal - build the erase layer if forgetting is implemented
+        if self.forgetting == True:
+            self.e_layer = nn.Linear(self.modeltpl_cfg['dim_s'], self.modeltpl_cfg['dim_s'])  ## Forgetting - Erase layer
         self.a_layer = nn.Linear(self.modeltpl_cfg['dim_s'], self.modeltpl_cfg['dim_s'])
 
 
@@ -52,30 +55,30 @@ class DKVMN(GDBaseModel):
         w = torch.softmax(torch.matmul(k, self.Mk.T), dim=-1)
 
         # Write Process
-        # Option 2: Feature Removal - remove the next line to remove forgetting
-        e = torch.sigmoid(self.e_layer(v)) ## Forgetting - memory erase
+        # Forgetting Removal
+        if self.forgetting == True:
+            e = torch.sigmoid(self.e_layer(v)) ## Forgetting - memory erase
         a = torch.tanh(self.a_layer(v))
+
+        if self.forgetting == True:
+        ####################################################################################################################
+            for at, wt in zip(
+                    a.permute(1, 0, 2), w.permute(1, 0, 2) ## Erase mechanism is not considered
+            ):
+                Mvt = Mvt + (wt.unsqueeze(-1) * at.unsqueeze(1)) ## Erase mechanism is not considered
+                Mv.append(Mvt)
+        ####################################################################################################################
+        else: 
+        # DKVMN's original implementation
+        #####################################################################################################################
+            for et, at, wt in zip( 
+                    e.permute(1, 0, 2), a.permute(1, 0, 2), w.permute(1, 0, 2) 
+            ):
+                Mvt = Mvt * (1 - (wt.unsqueeze(-1) * et.unsqueeze(1))) + (wt.unsqueeze(-1) * at.unsqueeze(1))
+
+                Mv.append(Mvt)
+        #####################################################################################################################
         
-        # Option 1: DKVMN's forgetting implementation (untouched original code)
-        #####################################################################################################################
-        for et, at, wt in zip( 
-                e.permute(1, 0, 2), a.permute(1, 0, 2), w.permute(1, 0, 2) 
-        ):
-            Mvt = Mvt * (1 - (wt.unsqueeze(-1) * et.unsqueeze(1))) + (wt.unsqueeze(-1) * at.unsqueeze(1))
-
-            Mv.append(Mvt)
-        #####################################################################################################################
-
-
-        # Option 2: Feature Removal - remove forgetting
-        #####################################################################################################################
-        # for at, wt in zip(
-        #         a.permute(1, 0, 2), w.permute(1, 0, 2) ## Erase mechanism is not considered
-        # ):
-        #     Mvt = Mvt + (wt.unsqueeze(-1) * at.unsqueeze(1)) ## Erase mechanism is not considered
-        #     Mv.append(Mvt)
-        #####################################################################################################################
-
         Mv = torch.stack(Mv, dim=1)
 
         # Read Process
