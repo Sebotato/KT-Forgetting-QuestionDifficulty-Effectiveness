@@ -17,6 +17,7 @@ class HawkesKT(GDBaseModel):
         'emb_size': 64,
         'time_log': 5,  # Log base of time intervals.
         'forgetting': True,
+        'quesDiff': True,
     }
 
     def __init__(self, cfg):
@@ -34,6 +35,7 @@ class HawkesKT(GDBaseModel):
         self.emb_size = self.modeltpl_cfg['emb_size']
         self.time_log = self.modeltpl_cfg['time_log']
         self.forgetting = self.modeltpl_cfg['forgetting']
+        self.quesDiff = self.modeltpl_cfg['quesDiff']
 
 
     def build_model(self):
@@ -45,14 +47,6 @@ class HawkesKT(GDBaseModel):
         self.alpha_skill_embeddings = torch.nn.Embedding(self.skill_num, self.emb_size)
         self.beta_inter_embeddings = torch.nn.Embedding(self.skill_num * 2, self.emb_size)
         self.beta_skill_embeddings = torch.nn.Embedding(self.skill_num, self.emb_size)
-
-        ## Swap with simpleKT Question Difficulty
-        embed_l = self.emb_size
-        self.n = self.problem_num
-        self.difficult_param = torch.nn.Embedding(self.n + 1, 1) ## Feature Swap
-        self.qa_embed_diff = torch.nn.Embedding(2 * self.skill_num + 1, embed_l) ## Feature Swap
-        self.q_embed_diff = torch.nn.Embedding(self.skill_num + 1, embed_l) ## Feature Swap
-
 
     def _init_params(self):
         """Parameter initialization of each component of the model"""
@@ -102,6 +96,67 @@ class HawkesKT(GDBaseModel):
 
             # Intensity function with F removed
             prediction = (problem_bias + skill_bias + sum_t).sigmoid()
+            return prediction
+        
+        elif self.quesDiff == False:
+            skills = cpt_unfold_seq     # [batch_size, seq_len] One exercise corresponds to one knowledge point
+            problems = exer_seq  # [batch_size, seq_len] sequence of batch_size students
+            # time = [i for i in range(start_timestamp_seq.shape[1])]
+            # times = torch.Tensor([time for i in range(start_timestamp_seq.shape[0])])
+            times = start_timestamp_seq - start_timestamp_seq[:,[0]]        # [batch_size, seq_len]
+
+            mask_labels = kwargs['mask_seq'].long()
+            inters = skills + mask_labels * self.skill_num
+
+            alpha_src_emb = self.alpha_inter_embeddings(inters)  # [bs, seq_len, emb]
+            alpha_target_emb = self.alpha_skill_embeddings(skills)
+            alphas = torch.matmul(alpha_src_emb, alpha_target_emb.transpose(-2, -1))  # [bs, seq_len, seq_len]
+            beta_src_emb = self.beta_inter_embeddings(inters)  # [bs, seq_len, emb]
+            beta_target_emb = self.beta_skill_embeddings(skills)
+            betas = torch.matmul(beta_src_emb, beta_target_emb.transpose(-2, -1))  # [bs, seq_len, seq_len]
+            betas = torch.clamp(betas + 1, min=0, max=10)  
+
+            delta_t = (times[:, :, None] - times[:, None, :]).abs().double()  # Get the absolute value of the time at different time steps
+            delta_t = torch.log(delta_t + 1e-10) / np.log(self.time_log)
+
+            cross_effects = alphas * torch.exp(-betas * delta_t)  # The cross_effects of the paper (4)
+
+            seq_len = skills.shape[1]
+            valid_mask = np.triu(np.ones((1, seq_len, seq_len)), k=1)
+            mask = (torch.from_numpy(valid_mask) == 0)
+            mask = mask.cuda() if self.device != 'cpu' else mask
+            sum_t = cross_effects.masked_fill(mask, 0).sum(-2)
+            # Remove QD
+            skill_bias = self.skill_base(skills).squeeze(dim=-1)
+
+            prediction = (skill_bias + sum_t).sigmoid()
+            return prediction
+        
+        elif self.quesDiff == False and self.forgetting == False:
+            skills = cpt_unfold_seq     # [batch_size, seq_len] One exercise corresponds to one knowledge point
+            problems = exer_seq  # [batch_size, seq_len] sequence of batch_size students
+
+            mask_labels = kwargs['mask_seq'].long()
+            inters = skills + mask_labels * self.skill_num
+
+            # Mutual excitation
+            alpha_src_emb = self.alpha_inter_embeddings(inters)  # [bs, seq_len, emb]
+            alpha_target_emb = self.alpha_skill_embeddings(skills)
+            alphas = torch.matmul(alpha_src_emb, alpha_target_emb.transpose(-2, -1))  # [bs, seq_len, seq_len]
+
+            # Remove F: The cross effect now only constitues of the immediate effect (mutual excitation)
+            cross_effects = alphas  # The cross_effects of the paper (4)
+
+            seq_len = skills.shape[1]
+            valid_mask = np.triu(np.ones((1, seq_len, seq_len)), k=1)
+            mask = (torch.from_numpy(valid_mask) == 0)
+            mask = mask.cuda() if self.device != 'cpu' else mask
+            sum_t = cross_effects.masked_fill(mask, 0).sum(-2)
+
+            # Remove QD
+            skill_bias = self.skill_base(skills).squeeze(dim=-1)
+
+            prediction = (skill_bias + sum_t).sigmoid()
             return prediction
         
         else:
