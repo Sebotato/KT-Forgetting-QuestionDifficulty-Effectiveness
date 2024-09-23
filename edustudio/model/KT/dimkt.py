@@ -27,11 +27,13 @@ class DIMKT(GDBaseModel):
        'emb_size': 128  # dimension of embedding
        'dropout_rate': 0.2      # dropout rate
        'difficult_levels': 100+2         # difficulty level of the exercises
+       'quesDiff': True      # enable or remove question difficulty
     """
     default_cfg = {
         'emb_size': 128,
         'difficult_levels': 100+2,
-        'dropout':0.2
+        'dropout':0.2,
+        'quesDiff': True,
     }
 
     def build_cfg(self):
@@ -41,6 +43,7 @@ class DIMKT(GDBaseModel):
         self.emb_size = self.modeltpl_cfg['emb_size']
         self.dropout = self.modeltpl_cfg['dropout']
         self.difficult_levels = self.modeltpl_cfg['difficult_levels']
+        self.quesDiff = self.modeltpl_cfg['quesDiff']
         
     def build_model(self):
         self.sigmoid = Sigmoid()
@@ -54,14 +57,15 @@ class DIMKT(GDBaseModel):
         self.qd_emb = Embedding(self.difficult_levels , self.emb_size, device=self.device, padding_idx=0)
         self.a_emb = Embedding(2, self.emb_size, device=self.device)
         
-        # Option 1: DIMKT's implementation of question difficulty (original untouched code)
+        if self.quesDiff == True:
+        # DIMKT's implementation of question difficulty (original untouched code)
         #############################################################################################
-        self.linear_1 = Linear(4 * self.emb_size, self.emb_size)
+            self.linear_1 = Linear(4 * self.emb_size, self.emb_size)
         #############################################################################################
-
-        # Option 2: Feature Removal - remove question difficulty
+        else:
+        # Feature Removal - remove question difficulty
         #############################################################################################
-        #self.linear_1 = Linear(2 * self.emb_size, self.emb_size)  ## Adjust the dimensionality without the consideration of question difficulty
+            self.linear_1 = Linear(2 * self.emb_size, self.emb_size)  ## Adjust the dimensionality without the consideration of question difficulty
         #############################################################################################
 
         self.linear_2 = Linear(1 * self.emb_size, self.emb_size)
@@ -93,20 +97,22 @@ class DIMKT(GDBaseModel):
         target_sd = self.sd_emb(Variable(sdshft))
         target_qd = self.qd_emb(Variable(qdshft))
 
-        # Option 1: DIMKT's implementation of question difficulty (original untouched code)
+        if self.quesDiff == True:
+        # DIMKT's implementation of question difficulty (original untouched code)
         #############################################################################################
-        input_data = torch.cat((q_emb, c_emb, sd_emb, qd_emb), -1)
-        input_data = self.linear_1(input_data)
-        target_data = torch.cat((target_q, target_c, target_sd, target_qd), -1)
-        target_data = self.linear_1(target_data)
+            input_data = torch.cat((q_emb, c_emb, sd_emb, qd_emb), -1)
+            input_data = self.linear_1(input_data)
+            target_data = torch.cat((target_q, target_c, target_sd, target_qd), -1)
+            target_data = self.linear_1(target_data)
         #############################################################################################
 
-        # Option 2: Feature Removal - remove question difficulty
+        else:
+        # Feature Removal - remove question difficulty
         #############################################################################################
-        #input_data = torch.cat((q_emb, c_emb), -1)   ## remove the question difficulty embedding and the KC embedding
-        #input_data = self.linear_1(input_data)
-        #target_data = torch.cat((target_q, target_c), -1)   ## remove the question difficulty embedding and the KC embedding
-        #target_data = self.linear_1(target_data)
+            input_data = torch.cat((q_emb, c_emb), -1)   ## remove the question difficulty embedding and the KC embedding
+            input_data = self.linear_1(input_data)
+            target_data = torch.cat((target_q, target_c), -1)   ## remove the question difficulty embedding and the KC embedding
+            target_data = self.linear_1(target_data)
         #############################################################################################
 
         shape = list(sd_emb.shape)
