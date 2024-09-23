@@ -19,6 +19,7 @@ class QIKT(GDBaseModel):
         'loss_q_all_lambda': 0.0,
         'loss_q_next_lambda': 0.0,
         'output_mode': 'an_irt',
+        'quesDiff': True,
     }
 
     def __init__(self, cfg):
@@ -38,6 +39,7 @@ class QIKT(GDBaseModel):
         self.loss_q_next_lambda = self.modeltpl_cfg['loss_q_next_lambda']
         self.output_mode = self.modeltpl_cfg['output_mode']
         self.device = self.traintpl_cfg['device']
+        self.quesDiff = self.modeltpl_cfg['quesDiff']
 
     def build_model(self):
         num_q, num_c = self.n_item, self.n_cpt
@@ -92,23 +94,32 @@ class QIKT(GDBaseModel):
         concept_outputs = self.get_outputs(emb_qc_shift, concept_h, data=(cpt_seq[:, 1:, :], cpt_seq_mask[:, 1:, :]), add_name="", modeltpl_type="concept")
         outputs['y_concept_all'] = concept_outputs['y_concept_all']
         # Option 1: Feature Removal - comment out the next line to remove question difficulty
-        outputs['y_concept_next'] = concept_outputs['y_concept_next'] ## Question-centric Problem Solving Module - Question Difficulty 
+        if self.quesDiff == True:
+            outputs['y_concept_next'] = concept_outputs['y_concept_next'] ## Question-centric Problem Solving Module - Question Difficulty 
 
 
         if self.output_mode=="an_irt":
             def sigmoid_inverse(x,epsilon=1e-8):
                 return torch.log(x/(1-x+epsilon)+epsilon)
-            y = sigmoid_inverse(outputs['y_question_all'])*self.output_q_all_lambda + \
-                sigmoid_inverse(outputs['y_concept_all'])*self.output_c_all_lambda + \
-                sigmoid_inverse(outputs['y_concept_next'])*self.output_c_next_lambda ## Question-centric Problem Solving Module - Question Difficulty 
-                # Option 1: Feature Removal - comment out the above line to remove question difficulty
+            if self.quesDiff == True:
+                y = sigmoid_inverse(outputs['y_question_all'])*self.output_q_all_lambda + \
+                    sigmoid_inverse(outputs['y_concept_all'])*self.output_c_all_lambda + \
+                    sigmoid_inverse(outputs['y_concept_next'])*self.output_c_next_lambda ## Question-centric Problem Solving Module - Question Difficulty 
+            else:
+                y = sigmoid_inverse(outputs['y_question_all'])*self.output_q_all_lambda + \
+                    sigmoid_inverse(outputs['y_concept_all'])*self.output_c_all_lambda
+
             y = torch.sigmoid(y)
         else:
             # output weight
-            y = outputs['y_question_all'] * self.output_q_all_lambda \
-                + outputs['y_concept_all'] * self.output_c_all_lambda \
-                + outputs['y_concept_next'] * self.output_c_next_lambda ## Question-centric Problem Solving Module - Question Difficulty 
-                # Option 1: Feature Removal - comment out the above line to remove question difficulty
+            if self.quesDiff == True:
+                y = outputs['y_question_all'] * self.output_q_all_lambda \
+                    + outputs['y_concept_all'] * self.output_c_all_lambda \
+                    + outputs['y_concept_next'] * self.output_c_next_lambda ## Question-centric Problem Solving Module - Question Difficulty 
+            else:
+                y = outputs['y_question_all'] * self.output_q_all_lambda \
+                    + outputs['y_concept_all'] * self.output_c_all_lambda
+                
             y = y/(self.output_q_all_lambda + self.output_c_all_lambda + self.output_c_next_lambda) 
         outputs['y'] = y
         return outputs
@@ -139,26 +150,34 @@ class QIKT(GDBaseModel):
         loss_q_all = self.get_loss(outputs['y_question_all'],rshft,maskshft)
         loss_c_all = self.get_loss(outputs['y_concept_all'],rshft,maskshft)
         # next
-        # Option 1: Feature Removal - comment out the following two lines to remove question difficulty
-        loss_q_next = self.get_loss(outputs['y_question_next'],rshft,maskshft)#question level loss Question-centric Problem Solving Module - Question Difficulty 
-        loss_c_next = self.get_loss(outputs['y_concept_next'],rshft,maskshft)#kc level loss Question-centric Problem Solving Module - Question Difficulty 
+        if self.quesDiff == True:
+            loss_q_next = self.get_loss(outputs['y_question_next'],rshft,maskshft)#question level loss Question-centric Problem Solving Module - Question Difficulty 
+            loss_c_next = self.get_loss(outputs['y_concept_next'],rshft,maskshft)#kc level loss Question-centric Problem Solving Module - Question Difficulty 
         # over all
         loss_kt = self.get_loss(outputs['y'],rshft,maskshft)
 
         if self.output_mode == "an_irt":
-            loss = loss_kt + \
-                   self.loss_q_all_lambda * loss_q_all + \
-                   self.loss_c_all_lambda * loss_c_all + \
-                   self.loss_c_next_lambda * loss_c_next ## Question-centric Problem Solving Module - Question Difficulty 
-                   # Option 1: Feature Removal - comment out the above line to remove question difficulty
+            if self.quesDiff == True:
+                loss = loss_kt + \
+                    self.loss_q_all_lambda * loss_q_all + \
+                    self.loss_c_all_lambda * loss_c_all + \
+                    self.loss_c_next_lambda * loss_c_next ## Question-centric Problem Solving Module - Question Difficulty 
+
+            else:
+                loss = loss_kt + \
+                    self.loss_q_all_lambda * loss_q_all + \
+                    self.loss_c_all_lambda * loss_c_all
         else:
-            loss = loss_kt + \
-                   self.loss_q_all_lambda * loss_q_all + \
-                   self.loss_c_all_lambda * loss_c_all + \
-                   self.loss_c_next_lambda * loss_c_next + \
-                   self.loss_q_next_lambda * loss_q_next 
-                   # Option 1: Feature Removal - comment out the above two lines to remove question difficulty
-            
+            if self.quesDiff == True:
+                loss = loss_kt + \
+                    self.loss_q_all_lambda * loss_q_all + \
+                    self.loss_c_all_lambda * loss_c_all + \
+                    self.loss_c_next_lambda * loss_c_next + \
+                    self.loss_q_next_lambda * loss_q_next 
+            else:
+                loss = loss_kt + \
+                    self.loss_q_all_lambda * loss_q_all + \
+                    self.loss_c_all_lambda * loss_c_all    
 
                    
 
