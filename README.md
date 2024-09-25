@@ -1,8 +1,8 @@
 # Forgetting and Question Difficulty Ablation Study
-This repository accompanies the paper "Explore the Effectiveness of Forgetting and Question Difficulty Modelled in Deep Learning-Based Knowledge Tracing" submitted for double-blind review at LAK25.
+This repository accompanies the paper "Exploring the Effectiveness of Forgetting and Question Difficulty Features Modelled in Deep Learning-Based Knowledge Tracing Models" submitted for double-blind review at LAK25.
 
 ## Overview
-This study investigates existing implementations of forgetting and question difficulty in deep learning-based KT by isolating these components and analysing their impact on model performance when removed. Our findings indicate that the effectiveness of forgetting and question difficulty is highly dependent on the model. Notably, modelling forgetting as an exponential decay term within self-attention mechanisms has proved to be the most effective. Additionally, incorporating question difficulty through the Rasch model into the input embeddings and integrating it into self-attention mechanisms optimises its effect. Furthermore, datasets with long-period student interaction information better capture the effects of forgetting and question difficulty, aligning with recent theories on human forgetting behaviour and the influence of question difficulty on learning.
+This study conducts an ablation analysis on existing implementations of forgetting and question difficulty in DKT models by isolating these components and analysing their impact on model performance when removed. Our findings indicate that the effectiveness of forgetting and question difficulty is highly dependent on the model. Notably, modelling forgetting as an exponential decay term within self-attention mechanisms has proved to be the most effective. Additionally, incorporating question difficulty through the Rasch model into the input embeddings and integrating it into self-attention mechanisms optimises its effect. Furthermore, datasets with long-period student interaction information better capture the effects of forgetting and question difficulty, aligning with recent theories on human forgetting behaviour and the influence of question difficulty on learning.
 
 ## Quick Start
 ### Installation
@@ -71,7 +71,6 @@ DKT models' configuration settings other than decay function can be found at : h
 | [SAINT+](https://dl.acm.org/doi/10.1145/3448139.3448188) | SAINT+: Integrating Temporal Features for EdNet Correctness Prediction | LAK | 2021 |
 | [DKVMN](https://arxiv.org/abs/1611.08108) | Dynamic Key-Value Memory Networks for Knowledge Tracing | WWW | 2017 |
 | [Deep-IRT](https://arxiv.org/abs/1904.11738) | Deep-IRT: Make Deep Learning Based Knowledge Tracing Explainable Using Item Response Theory | EDM | 2019 |
-| [EKT](https://ieeexplore.ieee.org/document/8744302) | EKT: Exercise-Aware Knowledge Tracing for Student Performance Prediction | TKDE | 2019 |
 | [DIMKT](https://dl.acm.org/doi/abs/10.1145/3477495.3531939) | Assessing Student's Dynamic Knowledge State by Exploring the Question Difficulty Effect | SIGIR | 2022 |
 | [QIKT](https://arxiv.org/abs/2302.06885) | Improving Interpretability of Deep Sequential Knowledge Tracing Models with Question-centric Cognitive Representations | AAAI | 2023 |
 
