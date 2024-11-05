@@ -8,7 +8,7 @@ This study conducts an ablation analysis on existing implementations of forgetti
 ### Installation
 All implementations are conducted via the publicly available [EduStudio](https://edustudio.ai) library. EduStudio is compatible with the following operating systems: Linux, Windows 10 and macOS X. 
 
-Python 3.8 (or later) and torch 1.10.0 (or later) are required to install EduStudio. There are two ways to install EduStudio.
+Python 3.8 (or later) and torch 1.10.0 (or later) are required to install EduStudio.
 
 ```bash
 pip install -U edustudio
