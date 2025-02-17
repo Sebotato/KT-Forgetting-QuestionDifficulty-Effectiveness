@@ -1,5 +1,5 @@
 # Forgetting and Question Difficulty Ablation Study
-This repository accompanies the paper "Exploring the Effectiveness of Forgetting and Question Difficulty Features Modelled in Deep Learning-Based Knowledge Tracing Models" submitted at AIED 2025.
+This repository accompanies the paper "Effectiveness of Forgetting and Question Difficulty in Deep Knowledge Tracing" submitted at AIED 2025.
 
 ## Overview
 This study conducts an ablation analysis on existing implementations of forgetting and question difficulty in DKT models by isolating these components and analysing their impact on model performance when removed. Our findings indicate that the effectiveness of forgetting and question difficulty is highly dependent on the model. Notably, modelling forgetting as an exponential decay term within self-attention mechanisms has proved to be the most effective. Additionally, incorporating question difficulty through the Rasch model into the input embeddings and integrating it into self-attention mechanisms optimises its effect. Furthermore, datasets with long-period student interaction information better capture the effects of forgetting and question difficulty, aligning with recent theories on human forgetting behaviour and the influence of question difficulty on learning.
